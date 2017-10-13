@@ -1,361 +1,185 @@
-import numpy as np
+from __future__ import division
 import sys 
 import matplotlib.pyplot as plt
+import scipy as sp
+from scipy.stats import signaltonoise
+from scipy.signal import argrelextrema
+from pylab import * 
+from PyAstronomy import pyasl
 
 from sklearn.preprocessing import normalize
 from sklearn.linear_model import OrthogonalMatchingPursuit
 from sklearn.linear_model import OrthogonalMatchingPursuitCV
 from sklearn.datasets import make_sparse_coded_signal
-
-from scipy.optimize import nnls
-
-'''
-#generate a random signal with max_p as maximum point, and min_p as minimum point of signal
-'''
-'''
-def generate_rand_signal(max_p, min_p, size):
-    np.
-    '''
-'''
-
-def generate_norm_gaussian(rows, col):
-    init = np.random.rand(rows, col)
-    gaussian = init/np.linalg.norm(init) # normalize the initiated gaussian matrix
-    print gaussian
-    return gaussian
+from sklearn.decomposition import DictionaryLearning
+import numpy as np
 
 
-x = np.random.uniform(-1, 1, (1,128)) * 10 #generate a random signal size of 128 points, with values ranging from -1 to 1
-phi = generate_norm_gaussian(40, 128) #generate normalized gaussian matrix of 40x128
-y = x.dot(np.matrix.transpose(phi)) # y = x * phi-transposed
-print "---"
-print y 
-'''
+from mp_functions import * #mp_functions contains all the MP algorithms to be tested.
+from Phi import Phi
+import matplotlib.pyplot as plt
+import unittest
+import math
+
+import operator
 
 
-class Result(object):
-    '''Result object for storing input and output data for omp.  When called from 
-    `omp`, runtime parameters are passed as keyword arguments and stored in the 
-    `params` dictionary.
-    Attributes:
-        X:  Predictor array after (optional) standardization.
-        y:  Response array after (optional) standarization.
-        ypred:  Predicted response.
-        residual:  Residual vector.
-        coef:  Solution coefficients.
-        active:  Indices of the active (non-zero) coefficient set.
-        err:  Relative error per iteration.
-        params:  Dictionary of runtime parameters passed as keyword args.   
-    '''
-    
-    def __init__(self, **kwargs):
-        
-        # to be computed
-        self.X = None
-        self.y = None
-        self.ypred = None
-        self.residual = None
-        self.coef = None
-        self.active = None
-        self.err = None
-        
-        # runtime parameters
-        self.params = {}
-        for key, val in kwargs.iteritems():
-            self.params[key] = val
-            
-    def update(self, coef, active, err, residual, ypred):
-        '''Update the solution attributes.
-        '''
-        self.coef = coef
-        self.active = active
-        self.err = err
-        self.residual = residual
-        self.ypred = ypred
+def SNR_Test(signal):
+    max_index, max_value = max(enumerate(signal), key=operator.itemgetter(1))
+    leftsignal = signal[0:max_index];
+    rightsignal = signal[max_index:];
 
-def omp(X, y, nonneg=True, ncoef=None, maxit=200, tol=1e-3, ztol=1e-12, verbose=True):
-    '''Compute sparse orthogonal matching pursuit solution with unconstrained
-    or non-negative coefficients.
-    
-    Args:
-        X: Dictionary array of size n_samples x n_features. 
-        y: Reponse array of size n_samples x 1.
-        nonneg: Enforce non-negative coefficients.
-        ncoef: Max number of coefficients.  Set to n_features/2 by default.
-        tol: Convergence tolerance.  If relative error is less than
-            tol * ||y||_2, exit.
-        ztol: Residual covariance threshold.  If all coefficients are less 
-            than ztol * ||y||_2, exit.
-        verbose: Boolean, print some info at each iteration.
-        
-    Returns:
-        result:  Result object.  See Result.__doc__
+    leftMin = array(leftsignal);
+    rightMin = array(rightsignal);
+
+    findLMin = argrelextrema(leftMin, np.less)[0][-1];
+    findRMin = argrelextrema(rightMin, np.less)[0][0]+len(leftsignal);
+
+    x = np.linspace(0, 100,len(signal));
+
+
+    Anoise = abs(np.mean(list(signal[0:findLMin])+list(signal[findRMin:])))
+    #Asignal = 1-(signal[findLMin]+signal[findRMin])/2
+    Asignal = 1-Anoise;
+
+    print (Asignal,Anoise)
+
+    snr_value = 20*np.log10(Asignal/Anoise);
+
+    '''    
+    plot(x[0:findLMin], signal[0:findLMin],'b')
+    plot(x[findLMin:findRMin],signal[findLMin:findRMin],'r')
+    plot(x[findRMin:],signal[findRMin:],'b');
+    plot([x[max_index], x[max_index]],[1, 1- Asignal],'r--');
+    plot(x, x*0+Anoise,'b--');
     '''
     
-    def norm2(x):
-        return np.linalg.norm(x) / np.sqrt(len(x))
+    #plot(list(xrange(len(signal))), signal,'b')
+    show();
     
-    # initialize result object
-    result = Result(nnoneg=nonneg, ncoef=ncoef, maxit=maxit,
-                    tol=tol, ztol=ztol)
-    if verbose:
-        print(result.params)
-    
-    # check types, try to make somewhat user friendly
-    if type(X) is not np.ndarray:
-        X = np.array(X)
-    if type(y) is not np.ndarray:
-        y = np.array(y)
-        
-    # check that n_samples match
-    if X.shape[0] != len(y):
-        print('X and y must have same number of rows (samples)')
-        return result
-    
-    # store arrays in result object    
-    result.y = y
-    result.X = X
-    
-    # for rest of call, want y to have ndim=1
-    if np.ndim(y) > 1:
-        y = np.reshape(y, (len(y),))
-        
-    # by default set max number of coef to half of total possible
-    if ncoef is None:
-        ncoef = int(X.shape[1]/2)
-    
-    # initialize things
-    X_transpose = X.T                        # store for repeated use
-    #active = np.array([], dtype=int)         # initialize list of active set
-    active = []
-    coefccmd = np.zeros(X.shape[1], dtype=float) # solution vector
-    residual = y                             # residual vector
-    ypred = np.zeros(y.shape, dtype=float)
-    ynorm = norm2(y)                         # store for computing relative err
-    err = np.zeros(maxit, dtype=float)       # relative err vector
-    
-    # Check if response has zero norm, because then we're done. This can happen
-    # in the corner case where the response is constant and you normalize it.
-    if ynorm < tol:     # the same as ||residual|| < tol * ||residual||
-        print('Norm of the response is less than convergence tolerance.')
-        result.update(coef, active, err[0], residual, ypred)
-        return result
-    
-    # convert tolerances to relative
-    tol = tol * ynorm       # convergence tolerance
-    ztol = ztol * ynorm     # threshold for residual covariance
-    
-    if verbose:
-        print('\nIteration, relative error, number of non-zeros')
-   
-    # main iteration
-    for it in range(maxit):
-        
-        # compute residual covariance vector and check threshold
-        rcov = np.dot(X_transpose, residual)
-        if nonneg:
-            i = np.argmax(rcov) #check the index location for maximum value in rcov
-            rc = rcov[i]
-        else:
-            i = np.argmax(np.abs(rcov)) #check the index location for maximum value in rcov, 
-            							#but this time only checking absolute value of elements
-            rc = np.abs(rcov[i])
-        if rc < ztol:
-            print('All residual covariances are below threshold.')
-            break
-        
-        # update active set
-        if i not in active:
-            #active = np.concatenate([active, [i]], axis=1)
-            active.append(i)
-            
-        # solve for new coefficients on active set
-        if nonneg:
-            coefi, _ = nnls(X[:, active], y)
-        else:
-            coefi, _, _, _ = np.linalg.lstsq(X[:, active], y)
-        coef[active] = coefi   # update solution
-        
-        # update residual vector and error
-        residual = y - np.dot(X[:,active], coefi)
-        ypred = y - residual
-        err[it] = norm2(residual) / ynorm  
-        
-        # print status
-        if verbose:
-            print('{}, {}, {}'.format(it, err[it], len(active)))
-            
-        # check stopping criteria
-        if err[it] < tol:  # converged
-            print('\nConverged.')
-            break
-        if len(active) >= ncoef:   # hit max coefficients
-            print('\nFound solution with max number of coefficients.')
-            break
-        if it == maxit-1:  # max iterations
-            print('\nHit max iterations.')
-    
-    result.update(coef, active, err[:(it+1)], residual, ypred)
-    return result
 
-def cosamp(X, y, nonneg=True, ncoef=None, maxit=200, tol=1e-3, ztol=1e-12, verbose=True):
-    '''Compute sparse orthogonal matching pursuit solution with unconstrained
-    or non-negative coefficients.
-    
-    Args:
-        X: Dictionary array of size n_samples x n_features. 
-        y: Reponse array of size n_samples x 1.
-        nonneg: Enforce non-negative coefficients.
-        ncoef: Max number of coefficients.  Set to n_features/2 by default.
-        tol: Convergence tolerance.  If relative error is less than
-            tol * ||y||_2, exit.
-        ztol: Residual covariance threshold.  If all coefficients are less 
-            than ztol * ||y||_2, exit.
-        verbose: Boolean, print some info at each iteration.
-        
-    Returns:
-        result:  Result object.  See Result.__doc__
-    '''
-    
-    def norm2(x):
-        return np.linalg.norm(x) / np.sqrt(len(x))
-    
-    # initialize result object
-    result = Result(nnoneg=nonneg, ncoef=ncoef, maxit=maxit,
-                    tol=tol, ztol=ztol)
-    if verbose:
-        print(result.params)
-    
-    # check types, try to make somewhat user friendly
-    if type(X) is not np.ndarray:
-        X = np.array(X)
-    if type(y) is not np.ndarray:
-        y = np.array(y)
-        
-    # check that n_samples match
-    if X.shape[0] != len(y):
-        print('X and y must have same number of rows (samples)')
-        return result
-    
-    # store arrays in result object    
-    result.y = y
-    result.X = X
-    
-    # for rest of call, want y to have ndim=1
-    if np.ndim(y) > 1:
-        y = np.reshape(y, (len(y),))
-        
-    # by default set max number of coef to half of total possible
-    if ncoef is None:
-        ncoef = int(X.shape[1]/2)
-    
-    # initialize things
-    X_transpose = X.T                        # store for repeated use
-    #active = np.array([], dtype=int)         # initialize list of active set
-    active = []
-    coef = np.zeros(X.shape[1], dtype=float) # solution vector
-    residual = y                             # residual vector
-    ypred = np.zeros(y.shape, dtype=float)
-    ynorm = norm2(y)                         # store for computing relative err
-    err = np.zeros(maxit, dtype=float)       # relative err vector
-    
-    # Check if response has zero norm, because then we're done. This can happen
-    # in the corner case where the response is constant and you normalize it.
-    if ynorm < tol:     # the same as ||residual|| < tol * ||residual||
-        print('Norm of the response is less than convergence tolerance.')
-        result.update(coef, active, err[0], residual, ypred)
-        return result
-    
-    # convert tolerances to relative
-    tol = tol * ynorm       # convergence tolerance
-    ztol = ztol * ynorm     # threshold for residual covariance
-    
-    if verbose:
-        print('\nIteration, relative error, number of non-zeros')
-   
-    # main iteration
-    for it in range(maxit):
-        
-        # compute residual covariance vector and check threshold
-        rcov = np.dot(X_transpose, residual)
-        if nonneg:
-            i = np.argmax(rcov)
-            rc = rcov[i]
-        else:
-            i = np.argmax(np.abs(rcov))
-            rc = np.abs(rcov[i])
-        if rc < ztol:
-            print('All residual covariances are below threshold.')
-            break
-        
-        # update active set
-        if i not in active:
-            #active = np.concatenate([active, [i]], axis=1)
-            active.append(i)
-            
-        # solve for new coefficients on active set
-        if nonneg:
-            coefi, _ = nnls(X[:, active], y)
-        else:
-            coefi, _, _, _ = np.linalg.lstsq(X[:, active], y)
-        coef[active] = coefi   # update solution
-        
-        # update residual vector and error
-        residual = y - np.dot(X[:,active], coefi)
-        ypred = y - residual
-        err[it] = norm2(residual) / ynorm  
-        
-        # print status
-        if verbose:
-            print('{}, {}, {}'.format(it, err[it], len(active)))
-            
-        # check stopping criteria
-        if err[it] < tol:  # converged
-            print('\nConverged.')
-            break
-        if len(active) >= ncoef:   # hit max coefficients
-            print('\nFound solution with max number of coefficients.')
-            break
-        if it == maxit-1:  # max iterations
-            print('\nHit max iterations.')
-    
-    result.update(coef, active, err[:(it+1)], residual, ypred)
-    return result
+    print snr_value
+    return snr_value;
 
+def SNR_Custom(signal, noise):
+    #Asignal = (1/signal.shape[0]) * np.sum(np.power(np.abs(signal),2))
+    Anoise = (1/noise.shape[0]) * np.sum(np.power(np.abs(noise),2))
+    signal_noise = signal+noise
+    Atotal = (1/signal_noise.shape[0]) * np.sum(np.power(np.abs(signal_noise),2))
+    return 10 * np.log10((Atotal+Anoise)/Anoise)
 
+def l2_norm(x): #assume x is a vector matrix
+    return np.sqrt(np.sum(np.abs(x)**2))
 
-n_components, n_features = 128, 40
-n_nonzero_coefs = 20
+def Recovery_Error(original_signal, test_signal):
+    return (l2_norm(original_signal - test_signal)/l2_norm(original_signal))
 
-# generate the data
-###################
-
-# y = Xw
-# |x|_0 = n_nonzero_coefs
-
-#generate sparse signal for later processing using MP or other versions of MP.
-y, X, w = make_sparse_coded_signal(n_samples=1,
-                                   n_components=n_components,
-                                   n_features=n_features,
-                                   n_nonzero_coefs=n_nonzero_coefs,
-                                   random_state=0)
 
 if len(sys.argv) > 1:
 	chosen_mp = sys.argv[1]
 else:
 	print "Please choose an MP to use"
 	sys.exit(0)
-#chosen_mp = sys.argv[1]
 
-if chosen_mp == 'OMP':
-	omp_res = omp(X,y)
-elif chosen_mp == 'BOMP':
-	sys.exit(0)
-else:
-	sys.exit(0)
+n_nonzero_coefs = input("Level of sparsity? ==> ")
+n_components = 128
+n_features = int(2.5*n_nonzero_coefs*math.log10(n_components))
+#n_nonzero_coefs = input("Level of sparsity? ==> ")
 
-#omp_res = omp(X,y)
+# generate the data
+###################
+
+# y = Phi * x
+# |Phi|_0 = n_nonzero_coefs
+
+#generate sparse signal for later processing using MP or other versions of MP.
+
+x = [ 7.14872976, 7.99683485, 6.77462035, 7.35682238, 3.46190329, 8.55134831, 1.23216904, 8.02565473, \
+      2.48947843, 0.4399024, 3.55781487, 2.50578499, 1.03091104, 7.78104952, 9.40652756, 3.77218784, \
+      8.71719537, 2.04096106, 3.91879149, 1.12852764, 4.11943121, 0.8026437, 4.27436005, 2.22510807, \
+      4.24192647, 5.13894762, 7.97346514, 4.25494931,0.18219066,1.03641905, 4.92143153, 6.45918122, \
+      4.45901416, 4.88407393, 2.09664697, 9.26577278, 3.23315769, 5.10595863, 0.39743349, 6.85745321, \
+      5.80064463, 4.08567124, 8.73795576, 1.6692493, 4.15961993, 8.07245449, 0.7881806, 0.49578293, \
+      1.67697071, 0.35945209, 4.66053785, 3.60989746, 7.54721211, 0.43692716, 8.04713456, 4.32884169, \
+      9.95651014, 0.40068128, 4.97639291, 2.48643936, 5.73888652, 8.22627389, 9.95704624, 0.67972128, \
+      5.80171823, 8.4017826 , 8.39536605, 5.58673626, 7.46459042, 8.66673671, 0.38849337, 8.84118978, \
+      7.12208901, 7.28906882, 7.0982191 , 7.45902509, 2.12682096, 1.72751311, 5.48903346, 2.61131723, \
+      3.02831813, 3.32375689, 4.18218502, 4.86000617, 9.72692941, 3.16326772, 0.75072162, 2.27796348, \
+      2.71191956, 7.72377838, 2.77066899, 1.76803678, 2.80066975, 6.1347283 , 8.64868878, 5.53528607, \
+      0.5610447 , 2.65741932, 4.14732198, 4.53096657, 5.60758129, 2.58230706, 2.56200613, 5.76862782, \
+      1.86675798, 4.40260582, 0.45601149, 0.94533482, 1.76847433, 1.50444219, 7.52284895, 4.43420321, \
+      2.02678887, 5.48042672, 8.10572836, 6.7875623 , 4.84552806, 2.76148075, 9.47333587, 4.93576891, \
+      1.23842482, 0.8383871 , 1.63126236, 3.65153318, 2.78567095, 9.52601736, 4.68414818,5.85502263]
 '''
-print res.residual
+y, Phi, x = make_sparse_coded_signal(n_samples=1,
+                                   n_components=n_components,
+                                   n_features=n_features,
+                                   n_nonzero_coefs=n_nonzero_coefs,
+                                   random_state=0)
 '''
-#omp = OrthogonalMatchingPursuit(n_nonzero_coefs = n_nonzero_coefs)
+x_actual = np.array(x)
+x_test = np.zeros(x_actual.shape[0])
+x_test[0:n_nonzero_coefs] = x_actual[0:n_nonzero_coefs]
+
+n = len(x_test)
+m = 105 #int(2.5*n_nonzero_coefs*math.log10(n))
+#Phi = np.random.normal(0, 0.5, [m,n])
+Phi = np.array(Phi)
+y_test = np.dot(Phi, x_test)
+noise = np.random.normal(0, 10 * 1/25, y_test.shape[0])
+snr_value = SNR_Custom(y_test,noise)
+print snr_value
+
+#test the chosen mp loop
+print "================== Result of using {} ==================". format(chosen_mp)
+'''
+if chosen_mp == "cosamp":
+    res, iterations = cosamp(Phi, y, sparsity_chosen)
+'''
+
+x_mp, num_of_it, _= mp_process(Phi, y_test, chosen_mp, ncoef=n_nonzero_coefs, verbose=True)
+'''
+omp_process = OrthogonalMatchingPursuit(n_nonzero_coefs=n_nonzero_coefs)
+omp_process.fit(Phi, y_test)
+x_mp = omp_process.coef_
+'''
+#x_mp = res.coef
+
+
+#x_omp = res
+
+
+print "Recovery Error between omp result and original x:"
+R_error = Recovery_Error(x_test, x_mp)
+rms_cur = np.sqrt(np.mean(abs(x_test - x_mp)**2, axis=None))
+#rms = np.mean(abs(x_mp-x_test)**2, axis=None)
+print R_error, rms_cur
+
+print "=============================================================================== \n"
+
+print "\noriginal x: "
+print x_test
+
+print "\n\nresulting x with {}: ".format(chosen_mp)
+print x_mp
+
+sys.exit(0)
+
+'''
+idx_r, = coef.nonzero()
+idn, = new_coef.nonzero()
+print idx_r, idn
+print np.shape(new_coef[idn]), np.shape(idn)
+plt.subplot(312)
+plt.xlim(0, n_components)
+plt.title("Recovered signal from noise-free measurements")
+plt.stem(idx_r, coef[idx_r])
+
+plt.subplot(313)
+plt.xlim(0, n_components)
+plt.title("Recovered signal from noise-free measurements using custom OMP")
+plt.stem(idn, new_coef[idn])
+
+
+plt.show()
+'''
