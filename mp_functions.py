@@ -105,7 +105,7 @@ def mp_process(Phi, y, chosen_mp=None, ncoef=None, maxit=1000, tol=1e-3, ztol=1e
     
     # for rest of call, want y to have ndim=1
     if np.ndim(y) > 1:
-        y = np.reshape(y, (len(y),))
+        y = np.reshape(y, (y.shape[0]*y.shape[1],))
 
     # by default set max number of coef to half of total possible (as in half of # of column in Phi)
     if ncoef is None:
