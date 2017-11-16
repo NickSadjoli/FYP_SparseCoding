@@ -1,5 +1,6 @@
 import numpy as np
 import sys
+import time
 
 if len(sys.argv) == 3:
     try:
@@ -22,7 +23,8 @@ if (type(m) is not int) or (type(n) is not int):
     sys.exit(0)
 '''
 
-print '['
+print 'Phi = ['
+
 for i in range(0,m):
     row = []
     for k in np.random.normal(0,0.5,[1,n])[0]:

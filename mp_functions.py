@@ -46,7 +46,6 @@ class Result(object):
         self.ypred = ypred
 
 
-
 def norm2(v):
         return np.linalg.norm(v) / np.sqrt(len(v))
 
@@ -158,6 +157,7 @@ def omp_loop(Phi, y, ncoef, maxit, tol, ztol, verbose, result_obj):
         result:  Result object.  See Result.__doc__
     '''
     # initialize things
+    #y = np.reshape(y, (len(y), 1))
     t0 = time.time() 
     result = result_obj
     Phi_transpose = Phi.T                        # store for repeated use
@@ -201,17 +201,18 @@ def omp_loop(Phi, y, ncoef, maxit, tol, ztol, verbose, result_obj):
             active.append(i)
 
         #print active
-        cur_Phi[:,it] = Phi[:,i]
-        cur_Phi_act = cur_Phi[:,0:it+1]
+        cur_Phi[:,active] = Phi[:,active]
+        #cur_Phi_act = cur_Phi[:,0:it+1]
         # solve for new coefficients on new active set
         #print active
         #print np.shape(Phi[:, active])
-        # coefi, _, _, _ = np.linalg.lstsq(Phi[:, active], y)
-        coefi, _, _, _ = np.linalg.lstsq(cur_Phi_act, y)
+        #coefi, _, _, _ = np.linalg.lstsq(Phi[:, active], y)
+        coefi, _, _, _ = np.linalg.lstsq(cur_Phi, y)
         coef[active] = coefi   # update solution, i.e update the latest coefficient vector for current active set
         
         # update residual vector and error
-        residual = y - np.dot(cur_Phi_act, coefi)
+        residual = y - np.dot(cur_Phi, coefi)
+        #residual = y - np.dot(Phi[:, active].T, y)
         ypred = y - residual
         err[it] = norm2(residual) / ynorm  
         
@@ -332,6 +333,8 @@ def bomp_loop(Phi, y, s, maxit, tol, ztol, verbose, result_obj):
 
         rcoef = np.dot(Phi_transpose, residual)
         max_index = np.argmax(np.abs(rcoef))
+        if verbose:
+                print('max_index = ', max_index)
         rc_val = abs(rcoef[max_index])
     
         if rc_val < ztol:
@@ -378,16 +381,20 @@ def bomp_loop(Phi, y, s, maxit, tol, ztol, verbose, result_obj):
                     print('\n BOMP has already chosen the same index somehow!')
                 break
         
-
+                
         active_blocks = np.zeros(Phi.shape)
         #print active_set, max_index
         active_blocks[:,active_set] = Phi[:,active_set]
+        if verbose:
+                print('calculating coef')
         '''
         Update solution, Note that solving for least squares with new sized active blocks gives you exact same size of solution.
         This means that you don't need to relist or reconcatenate anything in this case (unlike normal omp)
         ''' 
         #coef, _, _, _ = np.linalg.lstsq(Phi[:, active_set], y)
         coef, _, _, _ = np.linalg.lstsq(active_blocks, y)
+        if verbose:
+                print('calculated coef.')
         '''
         m = np.zeros(rcoef.shape[0], dtype=float)
 
@@ -396,6 +403,8 @@ def bomp_loop(Phi, y, s, maxit, tol, ztol, verbose, result_obj):
         # update residual vector and error
         #residual = y - np.dot(Phi[:,active_set], coef[active_set])
         residual = y - np.dot(active_blocks, coef)
+        if verbose:
+                print('calculated residual.')
         #residual = residual - np.dot(Phi, m)
         ypred = y - residual
         #err[it] = norm2(residual) / ynorm  
@@ -560,13 +569,14 @@ def cosamp(phi, y, s, epsilon=1e-10, max_iter=1000, verbose=False):
         #    print("Iteration {}\r".format(it))
         
         P = np.dot(np.transpose(phi), residual)
-        omega_set = np.argsort(P)[-(2*s):] # large components
+        omega_set = np.argsort(P, kind='heapsort')[-(2*s):] # large components
         omega_set = np.union1d(omega_set, a.nonzero()[0]) # use set instead?
         phiOmega_set = phi[:, omega_set]
         b = np.zeros(phi.shape[1])
 
         # Solve Least Square for signal estimation. Note components picked in range of strongest Omega_set sets (Phi[:, Omega_set])
         b[omega_set], _, _, _ = np.linalg.lstsq(phiOmega_set, y)
+        #print b[0]
         
         # Get new estimate
         b[np.argsort(b)[:-s]] = 0
