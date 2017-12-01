@@ -1,6 +1,6 @@
 '''
 Author: Nicholas Sadjoli
-Description: Test script for checking performance of chosen MP based on varying sparsity of input signal
+Description: Test script for checking performance of chosen MP based on varying M_value of input signal
 '''
 
 from __future__ import division
@@ -99,7 +99,8 @@ R_error_w_noise = [0]
 runtime = [0]
 runtime_w_noise = [0]
 snr_values = [0]
-sparsity_values = range(0, 81)
+m_values = range(0, 115)
+M_value = 30
 '''
 if verbose == None:
   verbose = False
@@ -117,7 +118,7 @@ else:
   vbose = False
 '''
 
-for s in sparsity_values[1:]: #cannot start with sparsity 0, since that means there is no non-zero components anyways
+for m in m_values[1:]: #cannot start with M_value 0, since that means there is no non-zero components anyways
   '''
   # generate the data
   ###################
@@ -130,10 +131,10 @@ for s in sparsity_values[1:]: #cannot start with sparsity 0, since that means th
   #x_test = x_actual
   
   x_test = np.zeros(x_actual.shape[0])
-  x_test[0:s] = x_actual[0:s]
+  x_test[0:M_value] = x_actual[0:M_value]
   
   n = len(x_test)
-  m = 105 #int(2.5*s*math.log10(n))
+  #m = 105 #int(2.5*s*math.log10(n))
 
   #Phi = np.random.normal(0, 0.5, [m,n])
 
@@ -144,7 +145,6 @@ for s in sparsity_values[1:]: #cannot start with sparsity 0, since that means th
 
   if chosen_mp == "omp-scikit":
     omp_process = OrthogonalMatchingPursuit(n_nonzero_coefs=s)
-    print np.shape(Phi), np.shape(y_test)
     omp_process.fit(Phi, y_test)
     x_mp = omp_process.coef_
     omp_process_noise = OrthogonalMatchingPursuit(n_nonzero_coefs=s)
@@ -155,11 +155,11 @@ for s in sparsity_values[1:]: #cannot start with sparsity 0, since that means th
   else:
     
     if max_iter is None:
-      x_mp, numit, time = mp_process(Phi, y_test, ncoef=s, verbose=vbose)
-      x_mp_noise,numit,time_noise = mp_process(Phi, y_test + noise, ncoef=s, verbose=vbose)
+      x_mp, numit, time = mp_process(Phi, y_test, ncoef=M_value, verbose=vbose)
+      x_mp_noise,numit,time_noise = mp_process(Phi, y_test + noise, ncoef=M_value, verbose=vbose)
     else:
-      x_mp, numit, time = mp_process(Phi, y_test, ncoef=s, maxit=max_iter, verbose=vbose)
-      x_mp_noise,numit,time_noise = mp_process(Phi, y_test + noise, ncoef=s, maxit=max_iter, verbose=vbose)
+      x_mp, numit, time = mp_process(Phi, y_test, ncoef=s, maxit=M_value, verbose=vbose)
+      x_mp_noise,numit,time_noise = mp_process(Phi, y_test + noise, ncoef=M_value, maxit=max_iter, verbose=vbose)
   
 
   #noise = np.random.normal(0, 1/25, y.shape[0])
@@ -172,7 +172,7 @@ for s in sparsity_values[1:]: #cannot start with sparsity 0, since that means th
     if rms_cur < 20:
       rms.append(rms_cur)
     else:
-      test, _, _ = mp_process(Phi, y_test, ncoef=s, verbose=True)
+      test, _, _ = mp_process(Phi, y_test, chosen_mp, ncoef=s, verbose=True)
       rms.append(0.5)
     #runtime.append(time)
   
@@ -199,59 +199,59 @@ for s in sparsity_values[1:]: #cannot start with sparsity 0, since that means th
     runtime.append(time)
     runtime_w_noise.append(time_noise)
   snr_values.append(SNR_Custom(y_test, noise)) 
-  print 'done for s = ' + str(s) + ": " + str(rms_cur)
+  print 'done for m = ' + str(m) + ": " + str(rms_cur)
 
 #print snr_values
 plt.figure(1)
 plt.subplot2grid((4,2), (0,0), colspan=1)
-plt.plot(sparsity_values, rms, 'go')
-rms_trend = trendline_fit(sparsity_values, rms)
-plt.plot(sparsity_values, rms_trend(sparsity_values), 'g--')
+plt.plot(m_values, rms, 'go')
+rms_trend = trendline_fit(m_values, rms)
+plt.plot(m_values, rms_trend(m_values), 'g--')
 plt.ylabel('RMS of {}'.format(chosen_mp))
-plt.xlabel('Sparsity')
+plt.xlabel('M_value')
 
 plt.subplot2grid((4,2), (1,0), colspan=1)
-plt.plot(sparsity_values, rms_w_noise, 'ro')
-rms_noise_trend = trendline_fit(sparsity_values, rms_w_noise)
-plt.plot(sparsity_values, rms_noise_trend(sparsity_values), 'r--')
+plt.plot(m_values, rms_w_noise, 'ro')
+rms_noise_trend = trendline_fit(m_values, rms_w_noise)
+plt.plot(m_values, rms_noise_trend(m_values), 'r--')
 plt.ylabel('RMS w/ stable noise for {} '.format(chosen_mp))
-plt.xlabel('Sparsity')
+plt.xlabel('M_value')
 
 plt.subplot2grid((4,2), (2,0), colspan=1)
-plt.plot(sparsity_values, R_error, 'yo')
-R_error_trend = trendline_fit(sparsity_values, R_error)
-plt.plot(sparsity_values, R_error_trend(sparsity_values), 'y--')
+plt.plot(m_values, R_error, 'yo')
+R_error_trend = trendline_fit(m_values, R_error)
+plt.plot(m_values, R_error_trend(m_values), 'y--')
 plt.ylabel('RE for {} '.format(chosen_mp))
-plt.xlabel('Sparsity')
+plt.xlabel('M_value')
 
 plt.subplot2grid((4,2), (3,0), colspan=1)
-plt.plot(sparsity_values, R_error_w_noise, 'bo')
-R_error_noise_trend = trendline_fit(sparsity_values, R_error_w_noise)
-plt.plot(sparsity_values, R_error_noise_trend(sparsity_values), 'b--')
+plt.plot(m_values, R_error_w_noise, 'bo')
+R_error_noise_trend = trendline_fit(m_values, R_error_w_noise)
+plt.plot(m_values, R_error_noise_trend(m_values), 'b--')
 plt.ylabel('RE w/ stable noise for {} '.format(chosen_mp))
-plt.xlabel('Sparsity')
+plt.xlabel('M_value')
 
 
 plt.subplot2grid((4,2), (0,1), colspan=1)
-plt.plot(sparsity_values, snr_values, 'b-')
+plt.plot(m_values, snr_values, 'b-')
 plt.ylabel('SNR(in dB)')
-plt.xlabel('Sparsity')
+plt.xlabel('M_value')
 
 if chosen_mp != "omp-scikit":
 
   plt.subplot2grid((4,2), (1,1), colspan=1)
-  plt.plot(sparsity_values, runtime, 'ko')
-  runtime_trend = trendline_fit(sparsity_values, runtime)
-  plt.plot(sparsity_values, runtime_trend(sparsity_values), 'k--')
+  plt.plot(m_values, runtime, 'ko')
+  runtime_trend = trendline_fit(m_values, runtime)
+  plt.plot(m_values, runtime_trend(m_values), 'k--')
   plt.ylabel('Runtime of {}'.format(chosen_mp))
-  plt.xlabel('Sparsity')
+  plt.xlabel('M_value')
   
   plt.subplot2grid((4,2), (2,1), colspan=1)
-  plt.plot(sparsity_values, runtime_w_noise, 'ro')
-  runtime_noise_trend = trendline_fit(sparsity_values, runtime_w_noise)
-  plt.plot(sparsity_values, runtime_noise_trend(sparsity_values), 'r--')
+  plt.plot(m_values, runtime_w_noise, 'ro')
+  runtime_noise_trend = trendline_fit(m_values, runtime_w_noise)
+  plt.plot(m_values, runtime_noise_trend(m_values), 'r--')
   plt.ylabel('Runtime w/stable noise of {}'.format(chosen_mp))
-  plt.xlabel('Sparsity')
+  plt.xlabel('M_value')
 
 plt.show()
 

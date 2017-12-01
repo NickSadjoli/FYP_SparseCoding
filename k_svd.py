@@ -1,22 +1,58 @@
 import sys
 import math
 import numpy as np
+import tables as tb
 from y_test import y_test as y
 from mp_functions import *
+
+from utils import file_create
+from sklearn.linear_model import OrthogonalMatchingPursuit
+from sklearn.linear_model import OrthogonalMatchingPursuitCV    
 
 def l2_norm(v):
     return np.linalg.norm(v) / np.sqrt(len(v))
 
+def element_sum(v):
+    m, n = np.shape(v)
+    s = 0
+    square = 0
+    for i in range(0,m):
+        for j in range(0,n):
+            s+=v[i][j]
+            square += (v[i][j])**2
+
+    return s, square
+
 max_iter = None
-if len(sys.argv) > 1:
-    if len(sys.argv) == 2:
-        chosen_mp = sys.argv[1]
-    elif len(sys.argv) == 3:
-        chosen_mp = sys.argv[1]
-        max_iter = sys.argv[2]
+if len(sys.argv) == 4:
+    chosen_mp = sys.argv[1]
+    f_name = sys.argv[2]
+    sparsity = sys.argv[3]
+elif len(sys.argv) == 5:
+    chosen_mp = sys.argv[1]
+    f_name = sys.argv[2]
+    sparsity = sys.argv[3]
+    max_iter = sys.argv[4]
 else:
-    print "Please choose an MP to use"
+    print "Please give arguments with the form of:  [MP_to_use]  [output_file_name(wo/ '.h5' prefix)]  [#mp_sparsity]  [optional\ #max_iterations(used in the MP)]"
     sys.exit(0)
+
+mp_process = None
+
+if chosen_mp == 'omp':
+    mp_process = omp
+elif chosen_mp == 'bomp':
+    mp_process = bomp
+elif chosen_mp == 'cosamp':
+    mp_process = cosamp
+elif chosen_mp == 'bmpnils':
+    mp_process = bmpnils
+elif chosen_mp == 'omp-scikit':
+    mp_process = OrthogonalMatchingPursuit(n_nonzero_coefs=sparsity)
+else: 
+    print "Invalid MP chosen, please input a valid MP!"
+    sys.exit(0)
+
 '''
 rms = [0]
 R_error = [0]
@@ -27,6 +63,9 @@ runtime_w_noise = [0]
 snr_values = [0]
 '''
 
+y_file = tb.open_file("y_mini.h5", 'r')
+y = y_file.root.data[:]
+y_file.close()
 
 vbose = input("Verbose? ==> ")
 
@@ -51,20 +90,23 @@ y = [ 7.14872976, 7.99683485, 6.77462035, 7.35682238, 3.46190329, 8.55134831, 1.
 
 #print np.shape(y)
 
-y = np.reshape(y, [50, 200]) #reshape y so that it can be manipulated using SVD
+#y = np.reshape(y, [50, 200]) #reshape y so that it can be manipulated using SVD
 
-
-print np.shape(y)
-
+'''
 m = len(y)
-
-sparsity = 30
-
 f = 2.5
-
 n = int(math.pow(10,(m/(f*float(sparsity))))) #column of Phi
+'''
 
-Phi = np.random.normal(0, 0.5, [m,n])
+#sparsity = 30
+
+
+file = tb.open_file("Phi_mini.h5", 'r')
+Phi = file.root.data[:]
+file.close()
+n = np.shape(Phi)[1]
+
+#Phi = np.random.normal(0, 0.5, [m,n])
 
 Phi_init = np.zeros(Phi.shape)
 
@@ -75,43 +117,96 @@ tol = 1e-4
 for i in range(0,1000):
     Phi_old = np.zeros(Phi.shape)
     Phi_old[:] = Phi[:]
+    #print Phi
 
     # find approximation of x signal
     if chosen_mp == "omp-scikit":
-        omp_process = OrthogonalMatchingPursuit(n_nonzero_coefs=sparsity)
-        omp_process.fit(Phi, y_test)
-        x_mp = omp_process.coef_
+        print np.shape(Phi), np.shape(y)
+        print sparsity
+        mp_process = OrthogonalMatchingPursuit(n_nonzero_coefs=sparsity, tol=tol)
+        mp_process.fit(Phi, y)
+        x_mp = mp_process.coef_
+    elif max_iter is None:
+        x_mp, _, _ = mp_process(Phi, y, ncoef=sparsity, verbose=vbose)
     else:
-        if max_iter is None:
-            x_mp, _, _ = mp_process(Phi, y, chosen_mp, ncoef=sparsity, verbose=vbose)
+        x_mp, _, _ = mp_process(Phi, y, ncoef=sparsity, maxit=max_iter, verbose=vbose, )
 
     '''
     # Update dictionary, Phi
     '''
 
     #for every column in Phi...
-    for k in range(0, n+1):
+    for k in range(0, n):
         #pick the kth column from Phi
         atom = Phi[:,k]
 
         #make a copy of Phi, with the atom column ZEROED
         copy = np.zeros(Phi.shape)
         copy[:] = Phi[:]
-        copy[:,k] = 0
+        copy[:,k] = 0   
 
         #compute error between y and dot product of Phi's copy and x_mp
-        Error = y - np.dot(copy, x_mp)
+        #print np.shape(copy), np.shape(x_mp)
+        
+        y_noatom = np.dot(copy,x_mp)
+        y_noatom = np.reshape(y_noatom, (len(y_noatom),1))
+        #print "Y: ", np.shape(y_noatom)
+        #Error = y - np.dot(copy, x_mp)
+        Error = y - y_noatom
 
-        #should be restricting error to only columns corresponding to atom, but for this case, Error would have only 1 column anyways.
-        #apply Full SVD decomp
+        '''
+        should be restricting error to only columns corresponding to atom, but for this case, Error would have only 1 column anyways.
+        apply Full SVD decomp on Error vector
+        '''
+        #print "Error:", np.shape(Error)
         U,s,V = np.linalg.svd(Error, full_matrices=True)
-        Phi[:,k] = U[:,0] # update kth atom = 1st column of U
-        x_mp = np.dot(s[0,0], V[:,0]) # update x_mp (or, rather, k-th column of x_mp for y with m x p size) by multiplying 
-                                      #1st element of s and 1st column of V
+        ''' 
+            For a (100x1) y with a Phi size of (100x256), the sizes of: 
+            U => (100 x 1), s => (1 x 1), V => (1 x 1)
+        '''
+        # update kth atom of Phi = 1st column of U
+        Phi[:,k] = U[:,0] 
 
-    if l2_norm(Phi - Phi_old) < tol:
-        print "converged"
+
+        '''
+        update k-th value of x_mp by multiplying s and V 
+        (Note that in the case of y with m x p and NOT a m x 1 size, it should be multiplication of the 
+        1st element of s with the 1st column of V (i.e. s[0,0] * V[:,0])
+        '''
+        x_mp[k] = np.dot(s[0], V[:,0])
+
+    #print Phi
+
+    #print Phi_old 
+
+    #print Phi-Phi_old
+    #detected_norm = l2_norm(Phi - Phi_old)
+
+    previous_norm = l2_norm(Phi_old)
+    detected_norm = l2_norm(Phi)
+
+    #print previous_norm, detected_norm  
+
+    norm_diff = previous_norm - detected_norm
+
+    '''
+    sumation1, squares1 = element_sum(Phi_old)
+    sumation_new, squares_new = element_sum(Phi)
+    print sumation1, squares1
+    print sumation_new, squares
+    '''
+
+
+    #if l2_norm(Phi - Phi_old) < tol:
+    if abs(norm_diff) < tol:
+        print abs(norm_diff), "converged"
         break
 
+    print("Updated for: ", i , "-th iteration. Current norm = ", detected_norm)
+
+'''
 print Phi_init
 print Phi
+'''
+m,n = np.shape(Phi)
+file_create(f_name, Phi, m ,n)

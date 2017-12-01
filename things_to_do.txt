@@ -1,0 +1,94 @@
+define a sparse signal with varying sparsity value k
+M = fklogN
+define a snr value (25db) for your y where y = phi x
+run omp for y and phi
+get x_r
+calculate rms xr and x
+
+
+keep sparsity constant
+change snr  10db to 40 db
+run omp
+
+cprofile 
+
+
+
+def mp_process(Phi, y, chosen_mp=None, ncoef=None, maxit=1000, tol=1e-3, ztol=1e-12, verbose=False):
+    '''Main processing for creating sparse respresentation of an input y signal. Hosts several types
+    of MP (Matching Pursuit) algorithms to choose from, depending on user input
+
+    Args:
+        Phi: Dictionary array of size m_samples * n_features. 
+        y: Reponse array of size m_samples x 1.
+        chosen_mp: indicating which MP algorithm to use for the process.
+        cf: Extra argument, for use in BOMP or CoSaMP to either,
+            - CoSaMP: Indicate how sparse should the resulting dictionary of CoSaMP should be
+            - BOMP: Indicate how many slice of blocks should the signal y be sliced into.
+        ncoef: Max number of coefficients(max sparsity).  Set to n_features/2 by default.
+        tol: Convergence tolerance.  If relative error is less than
+            tol * ||y||_2, exit.
+        ztol: Residual covariance threshold.  If all coefficients are less 
+            than ztol * ||y||_2, exit.
+        verbose: Boolean, print some info at each iteration.
+        
+    Returns:
+        result:  Result object.  See Result.__doc__
+    '''
+    # initialize result object
+    result = Result(ncoef=ncoef, maxit=maxit,
+                    tol=tol, ztol=ztol, used_mp=chosen_mp)
+    '''
+    if verbose:
+        print(result.params)
+    '''
+    
+    # check types, try to make somewhat user friendly
+    if type(Phi) is not np.ndarray:
+        Phi = np.array(Phi)
+    if type(y) is not np.ndarray:
+        y = np.array(y)
+        
+    # check that n_samples match
+    if Phi.shape[0] != len(y):
+        print('Phi and y must have same number of rows (samples)')
+        return result
+    
+    # store arrays in result object    
+    result.y = y
+    result.Phi = Phi
+    
+    # for rest of call, want y to have ndim=1
+    if np.ndim(y) > 1:
+        y = np.reshape(y, (y.shape[0]*y.shape[1],))
+
+    # by default set max number of coef to half of total possible (as in half of # of column in Phi)
+    if ncoef is None:
+        ncoef = int(Phi.shape[1]/2)
+    
+    if chosen_mp == "omp":
+        if verbose:
+            print('\nIteration, relative error, number of non-zeros')
+        return omp_loop(Phi, y, ncoef, maxit, tol, ztol, verbose, result)
+    elif chosen_mp == "cosamp":
+        if verbose:
+            print('\nIteration, relative error, number of non-zeros')
+        #return cosamp_loop(Phi, y, ncoef, maxit, tol, ztol, verbose, result)
+        return cosamp(Phi, y, ncoef, epsilon=tol, max_iter=maxit, verbose=verbose)
+    elif chosen_mp == "bomp":
+        if verbose:
+            print('\nIteration, relative error, number of non-zeros')
+        return bomp_loop(Phi, y, ncoef, maxit, tol, ztol, verbose, result)
+    elif chosen_mp == "bmpnils":
+        '''
+        if verbose:
+            print('\nIteration, relative error, number of non-zeros')
+        '''
+        return bmpnils_loop(Phi, y, ncoef, maxit, tol, ztol, verbose, result)
+    elif chosen_mp == "":
+        return ()
+    elif chosen_mp == None:
+        print "No MP type chosen, please choose which MP you would like to choose!"
+        return
+
+    
