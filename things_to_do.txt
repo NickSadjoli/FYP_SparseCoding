@@ -92,3 +92,9 @@ def mp_process(Phi, y, chosen_mp=None, ncoef=None, maxit=1000, tol=1e-3, ztol=1e
         return
 
     
+Things to note:
+1. smaller sized y-s seems to be working fine with a k-svd trained Phi, so far tested up to 1000 size
+2. But the actual large y (i.e. 25000) seems to be not working so well using combination of smaller y size
+(note that actually getting a [25000 x h] sized Phi at this point is still almost impossible to do), 
+3. so far for combination method, best result obtained is for 1000 x 1500 sized Phi, trained by K-SVD for a sparsity value of 10
+4. Next possible alternative is the 6250 x 13000 Phi

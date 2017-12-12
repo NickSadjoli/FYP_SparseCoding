@@ -35,6 +35,18 @@ def SNR_Custom(signal, noise): # definition of SNR = 10 * log10(Psignal/Pnoise),
     return 10 * np.log10((Atotal+Anoise)/Anoise)
 
 
+#used to automatically place labels on the rectangular bar chart below
+def autolabel(rects, ax):
+    """
+    Attach a text label above each bar displaying its height
+    """
+    for rect in rects:
+        height = rect.get_height()
+        ax.text(rect.get_x() + rect.get_width()/2., 1.05*height,
+                '%.2f' % height,
+                ha='center', va='bottom')
+
+
 chosen_mp = None
 max_iter = None
 mp_process = None
@@ -89,10 +101,11 @@ y_actual = y_file.root.data[:]
 y_file.close()
 
 #get Phi from Phi_mini file
-file = tb.open_file("Phi_result.h5", 'r')
+file = tb.open_file("Phi_result_mini.h5", 'r')
 Phi = file.root.data[:]
 file.close()
-#y_actual = 
+
+#print_sizes(Phi, y_actual)
 
 for s in sparsity_values[:]: #cannot start with sparsity 0, since that means there is no non-zero components anyways
   '''
@@ -142,11 +155,15 @@ for s in sparsity_values[:]: #cannot start with sparsity 0, since that means the
       x_mp_noise,numit,time_noise = mp_process(Phi, y_actual + noise, ncoef=s, maxit=max_iter, verbose=vbose)
   
   y_tested = np.dot(Phi, x_mp)
+  y_tested = np.reshape(y_tested, (len(y_tested), 1) )
   y_noise = np.dot(Phi, x_mp_noise)
+  y_noise = np.reshape(y_noise, (len(y_noise), 1) ) 
   #noise = np.random.normal(0, 1/25, y.shape[0])
-  rms_cur = np.sqrt(np.mean(abs(y_actual - y_tested)**2, axis=None))
+  #rms_cur = np.sqrt(( np.sum((y_actual - y_tested) ** 2))/len(y_actual )) #make sure the y_tested and y_actual has exact same size!
+  rms_cur = RMS(y_actual, y_tested)
   R_error_cur = Recovery_Error(y_actual, y_tested)
-  rms_noise_cur = np.sqrt(np.mean(abs(y_actual - y_noise)**2, axis=None))
+  #rms_noise_cur = np.sqrt(np.mean(abs(y_actual - y_noise)**2, axis=None))
+  rms_noise_cur = RMS(y_actual, y_noise)
   R_error_noise_cur = Recovery_Error(y_actual, y_noise)
   
   if chosen_mp == 'bomp':
@@ -235,6 +252,33 @@ if chosen_mp != "omp-scikit":
   plt.xlabel('Sparsity')
 
 plt.show()
+
+ind = np.arange(len(y_actual))
+width = 0.35
+rect0 = axgrid[0].bar(ind, y_actual, color='g')
+axgrid[0].set_ylabel('Value')
+axgrid[0].set_title('Tested y')
+axgrid[0].set_xticks(ind+width/2)
+axgrid[0].set_xticklabels(tuple(ind))
+'''
+ind_i = np.arange(len(snr_values))
+rect1 = axgrid[1].bar(ind_i, snr_values, color='b')
+axgrid[1].set_ylabel('Value')
+axgrid[1].set_title('SNR values')
+axgrid[1].set_xticks(ind+width/2)
+axgrid[1].set_xticklabels(tuple(ind))
+'''
+ind_i = np.arange(len(noise_actual))
+rect1 = axgrid[1].bar(ind_i, noise_actual, color='b')
+axgrid[1].set_ylabel('Value')
+axgrid[1].set_title('SNR values')
+axgrid[1].set_xticks(ind_i+width/2)
+axgrid[1].set_xticklabels(tuple(ind_i))
+
+
+autolabel(rect0, axgrid[0])
+autolabel(rect0, axgrid[1])
+
 
 sys.exit(0)
 
