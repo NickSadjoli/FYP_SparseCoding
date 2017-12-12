@@ -2,7 +2,7 @@ import sys
 import math
 import numpy as np
 import tables as tb
-from y_test import y_test as y
+
 from mp_functions import *
 import threading
 
@@ -23,26 +23,33 @@ def Phi_learner(Phi_list, y_list, index=None):
     global mp_process
     global m
     global n
+
+    #create empty skeleton variable with same size as the Phi slices
     Phi = np.zeros((m,n))
+
     #If no index input, then indicates the inputted Phi and y are actual objects already, not a list!
     if index is None: 
         Phi = Phi_list[:]
         y = y_list
 
-    #else, then that means inputted Phi and y are lists, and thus need to pick object first.
+    #else, then that means inputted Phi and y are lists, and thus need to pick individual bject first.
     else:
         Phi[:] = Phi_list[index][:]
         y = np.zeros(np.shape(y_list[:, index]))
         y[:] = y_list[:, index]
-        '''
-        with print_lock:
-            print threading.current_thread().name, ":", y
-        '''
+
         y = np.reshape(y, (len(y), 1)) #making sure to stay consistent for mp calculations 
     
-    
+    '''
+    print the received sizes of y and Phi for current thread for easier debugging.
+    Use of print lock required to avoid print output that clashes with outputs from other 
+    thread(s)'s print's running in parallel as well 
+    '''
     with print_lock:
         print threading.current_thread().name, ":", np.shape(y), np.shape(Phi)
+
+    #prepare previous_norm variable to make iterations in later loop more effective
+    previous_norm = None
     
     for i in range(0,1000):
         Phi_old = np.zeros(Phi.shape)
@@ -62,94 +69,66 @@ def Phi_learner(Phi_list, y_list, index=None):
             x_mp, _, _ = mp_process(Phi, y, ncoef=sparsity, maxit=max_iter, verbose=vbose)
 
 
-        '''
-        # Update dictionary (Phi)
-        '''
+        
+        '''Update dictionary (Phi) '''
 
-        #for every column in Phi...
+        #for every atom (k-th atom) in Phi...
         for k in range(0, n):
-            #pick the kth column from Phi
-            atom = Phi[:,k]
 
-            #make a copy of Phi, with the atom column ZEROED
+            #make a copy of Phi, with the k-th atom column ZEROED
             copy = np.zeros(Phi.shape)
             copy[:] = Phi[:]
             copy[:,k] = 0   
 
             #compute error between y and dot product of Phi's copy and x_mp
-            #print np.shape(copy), np.shape(x_mp)
-            
+
             y_noatom = np.dot(copy,x_mp)
             y_noatom = np.reshape(y_noatom, (len(y_noatom),1))
-            #print "Y: ", np.shape(y_noatom)
-            #Error = y - np.dot(copy, x_mp)
+
             Error = y - y_noatom
-            #print_sizes(y, Error)
 
             '''
-            should be restricting error to only columns corresponding to atom, but for this case, Error would have only 1 column anyways.
-            apply Full SVD decomp on Error vector
-            '''
-            #print "Error:", np.shape(Error)
-            U,s,V = np.linalg.svd(Error, full_matrices=True)
-            ''' 
+            # Restrict error to be contribution from chosen atom. 
+            # In this case, error would have size of one column only.
+            # Hence apply full SVD decomp on Error vector.
+
+            # Example of SVD result: 
                 For a (100x1) y with a Phi size of (100x256), the sizes of: 
                 U => (100 x 1), s => (1 x 1), V => (1 x 1)
             '''
+
+            U,s,V = np.linalg.svd(Error, full_matrices=True)
+            
             # update kth atom of Phi = 1st column of U
             Phi[:,k] = U[:,0] 
 
-
-            '''
-            update k-th value of x_mp by multiplying s and V 
-            (Note that in the case of y with m x p and NOT a m x 1 size, it should be multiplication of the 
-            1st element of s with the 1st column of V (i.e. s[0,0] * V[:,0])
-            '''
-
-            '''
-            with print_lock:
-                print threading.current_thread().name, ": sizes for x_mp, s and V->" , np.shape(x_mp), np.shape(s), np.shape(V) 
-            '''
+            #update the k-th row of x_mp to be product of first column from V with first element value of s
             x_mp[k] = np.dot(s[0], V[:,0])
 
-        #print Phi
 
-        #print Phi_old 
+        #calculate l2_norm from previous and current Phi, and their differences
+        if previous_norm is None:
+            previous_norm = l2_norm(Phi_old)
 
-        #print Phi-Phi_old
-        #detected_norm = l2_norm(Phi - Phi_old)
+        current_norm = l2_norm(Phi)
 
-        previous_norm = l2_norm(Phi_old)
-        detected_norm = l2_norm(Phi)
+        norm_diff = previous_norm - current_norm
 
-        #print previous_norm, detected_norm  
+        #update previous_norm for next iteration's convergence testing
+        previous_norm = current_norm
 
-        norm_diff = previous_norm - detected_norm
-
-        '''
-        sumation1, squares1 = element_sum(Phi_old)
-        sumation_new, squares_new = element_sum(Phi)
-        print sumation1, squares1
-        print sumation_new, squares
-        '''
-        #if l2_norm(Phi - Phi_old) < tol:
+        #if norm difference is less than tol value, then Phi has already converged
         if abs(norm_diff) < tol:
             with print_lock:
                 print threading.current_thread().name, ":" , abs(norm_diff), "converged"
 
-            #break
+            #return value of Phi back to caller.
             return Phi
 
+        #print current thread iteration for visual debug. Note use of print lock as explained previously
         with print_lock:
             print threading.current_thread().name, ": Updated for ->", i, "-th iteration. Current norm =", l2_norm(Phi-Phi_old)
-        #print "Updated for: ", i , "-th iteration. Current norm = ", l2_norm(Phi-Phi_old)
-    '''
-    if index is None:
-        return
-    else:
-        Phi_list[index] = Phi
-        return
-    '''
+
 
 #process to learn and update Phi for y in matrix value
 def Phi_learner_multi_x(Phi, y_mp):
@@ -314,49 +293,44 @@ if np.shape(y)[0] <= 1000:
      
 
 else: 
-    length_y = np.shape(y)[0] / m #divide y into smaller len(y)/m pieces of sizes m
-    #y_mp = np.reshape(y, (m, length_y)) #reshape y into m rows of length_y small signals
-    y = np.reshape(y, (length_y, m)) #reshape y into length_y rows of m small signals
-    y_mp = y.T #transpose y first so that the m sinals are put on the side so for more accurate recovery by Phi (y=[mxk])
+    #divide y into smaller len(y)/m pieces of sizes m
+    length_y = np.shape(y)[0] / m 
+
+    #reshape y into length_y rows of m small signals
+    y = np.reshape(y, (length_y, m)) 
+
+    #transpose y first so that the m sinals are put on the side so for more accurate recovery by Phi (y=[mxk])
+    y_mp = y.T 
     g = np.shape(y_mp)[1]
     Phi_all = [Phi] * length_y
-    '''
-    for g in Phi_all:
-        print g
-    sys.exit(0)
-    '''
+
+    ''' 
+    #printing for debug purposes
+
     print np.shape(Phi_all)
     threads = [None] * length_y
     print np.shape(y_mp[:,0])
-    #sys.exit(0)
+    '''
 
-    #method that works so far, but slow (try to get it work better with threading?)
+    ''' ##method that works so far, but slow (try to get it work better with threading?)
+    For each Phi in Phi_all, learn a better Phi via Phi_learner (basically putting it through the actual K-SVD process)
+    '''
     for index in range(0,g):
         Phi_all[index] = Phi_learner(Phi_all, y_mp, index)
 
-    '''
-    for x in Phi_all:
-        print x
-        print '######'
-    '''
 
     Phi = Phi_all
-    #sys.exit(0)
+
 
 
 
 #for super large y signals
 
-'''
-print Phi_init
-print Phi
-'''
-#m,n = np.shape(Phi)
 print m, n, len(Phi)
-
+'''
 for x in Phi:
     print x
     print '######'
+'''
 
-#sys.exit(0)
 file_create(f_name, Phi, m ,n)
