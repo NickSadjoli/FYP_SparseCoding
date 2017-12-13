@@ -83,28 +83,7 @@ def process_y(y_input, s_thread):
 
 	for j in range(len(threads)):
 		threads[j].join()
-	#tf = time.time()
-	#print "time to complete all calculations", tf-t0
 
-	#ti = time.time()
-	#x_res = np.zeros((n,k))
-	#print np.shape(x_test)
-	#print_sizes(y_cur, x_test)
-	#x_test = np.array(x_test)
-	#print x_test.shape
-	#x_res = x_test.T #transpose the result since the actual returned matrix is supposed to be the other way.
-	#print np.shape(x_test)
-
-	#x_res = np.reshape(x_test, (np.shape(x_test)[1], np.shape(x_test)[0] ))
-	#print_sizes(y_cur, x_res)
-	'''
-	for x_comp in x_test:
-		#print x_comp
-		if x_res is None:
-			x_res = [x_comp]
-		else:
-			x_res = x_res + [x_comp]
-	'''
 	x_res = x_test
 	td = time.time()
 	#print "time to complete concatenation: ", td - ti
@@ -124,9 +103,7 @@ def autolabel(rects, ax):
 
 
 repeats = 10
-#file = tb.open_file("Phi_result_mini_ii.h5", 'r')
-file = tb.open_file("Phi_result_working.h5", 'r')
-#Phi = file.root.data[:]
+file = tb.open_file("Phi_result_test.h5", 'r')
 counter = count_nodes(file)
 print counter
 if counter > 1:
@@ -149,11 +126,6 @@ else:
 	Phi = file.root.data[:]
 	m,n = np.shape(Phi)
 
-'''
-for g in Phi:
-	print g
-	print np.shape(g), "######"
-'''
 
 file.close()
 
@@ -197,25 +169,7 @@ for i in range(1, repeats):
 	#cur_s = ((i/step)+1)* 1 #use this for the large Phi one, since this is gonna be done per thread
 	cur_s =  i * 1
 	t0 = time.time()
-	#num_of_x = len(y_test)/slice_size
-	
-	'''
-	omp_process = OrthogonalMatchingPursuit(n_nonzero_coefs=1000)
-	x_test1 = process_fit(omp_process, Phi, y_test[0:slice_size])
-	x_test2 = process_fit(omp_process, Phi, y_test[slice_size: slice_size*2])
-	x_test3 = process_fit(omp_process, Phi, y_test[slice_size*2: slice_size*3])
-	x_test4 = process_fit(omp_process, Phi, y_test[slice_size*3: slice_size*4])
-	'''
-	
-	'''
-	x_test1, _, _ = mp_process(Phi, y_test[0:slice_size], ncoef=100, verbose=False)
-	x_test2, _, _ = mp_process(Phi, y_test[slice_size: slice_size*2], ncoef=100, verbose=False)
-	x_test3, _, _ = mp_process(Phi, y_test[slice_size*2: slice_size*3], ncoef=1000, verbose = False)
-	x_test4, _, _ = mp_process(Phi, y_test[slice_size*3: slice_size*4], ncoef=1000, verbose=False)
-	
-	#x_test, _, _ = mp_process(Phi, y_test, 'omp', ncoef=20, verbose=False)
-	x_test = [x_test1]+[x_test2] +[x_test3]+ [x_test4]
-	'''
+
 	x_test, sparsity, mp_time = process_y(y_cur, cur_s)
 	#tf = time.time()
 	y_list.append(y_cur)
@@ -226,16 +180,14 @@ for i in range(1, repeats):
 	print "total time: " + str(tf-t0) + ' ' + str(cur_s)
 	print "" 
 
+x_testing = x_list[0] #used for looking at the non-zero elements of
+
 #print len(y_list), len(x_list)
 print "Errors experienced by each y slice: "
 for j in range(0, len(y_list)):
-	#print x_list[j]
-	#print y_list[j]
-	#print_sizes(Phi, x_list[j])
+
 	y_test = None
-	#print np.shape(x_list[j])
-	#x_print = np.reshape(x_list[j], (len(x_list[j]), 1))
-	#print x_list[j]
+
 	if counter > 1:
 		for k in range(0,np.shape(x_list[j])[1]):
 			slc = np.dot(Phi[k], x_list[j][:, k])
@@ -243,34 +195,10 @@ for j in range(0, len(y_list)):
 				y_test = slc
 			else:
 				y_test = np.concatenate((y_test, slc))
-		#y_res = y_test
-		#y_res = np.dot(Phi[j], x_list[j])
+
 	else:
 		y_test = np.dot(Phi, x_list[j])
-		#y_res = y_test
-		#y_res = np.dot(Phi, x_list[j])
-	#print np.shape(y_res)
-	#print np.shape(y_list[j]), np.shape(y_test)
-	#rms = np.sqrt(np.mean(abs(y_list[j] - y_test)**2, axis=None))
-	#print_sizes(y_list[j], y_res)
-	'''
-	
-	for k in range(np.shape(y_res)[1]):
-		#print np.shape(y_res[:,k])
-		if y_test is None:
-			y_test = y_res[:, k]
-		else:
-			y_test = np.concatenate((y_test, y_res[:, k]))
-			#print np.shape(y_test)
-	'''
 
-	'''
-	for k in range(np.shape(y_res)[0]):
-		if y_test is None:
-			y_test = y_res[k]
-		else:
-			y_test = np.concatenate((y_test, y_res[k]))
-	'''
 	
 	y_test = np.reshape(y_test, (len(y_test), 1) )
 	rms = RMS(y_list[j], y_test)
@@ -281,41 +209,10 @@ for j in range(0, len(y_list)):
 	#error_list.append(Recovery_Error(y_list[j],y_test))
 	error_list.append(r_error)
 	rms_list.append(rms)
-#print np.shape(yprint)
-
 
 #print RE, RMS and runtime relative to sparsity values
-''' 
-plt.figure(1)
-ax = plt.subplot2grid((3,1), (0,0))
-plt.plot(sparsity_list, error_list, 'go')
-error_trend = trendline_fit(sparsity_list, error_list)
-plt.plot(sparsity_list, error_trend(sparsity_list), 'g--')
-plt.ylabel('Recovery_Error of {}'.format(chosen_mp))
-plt.xlabel('Sparsity')
+print x_testing[0]
 
-ax = plt.subplot2grid((3,1), (1,0))
-plt.plot(sparsity_list, rms_list, 'bo')
-error_trend = trendline_fit(sparsity_list, rms_list)
-plt.plot(sparsity_list, error_trend(sparsity_list), 'g--')
-plt.ylabel('Recovery_Error of {}'.format(chosen_mp))
-plt.xlabel('Sparsity')
-
-
-plt.subplot2grid((3,1), (2,0))
-ax = plt.plot(sparsity_list, runtime_list, 'ro')
-for xy in zip(sparsity_list, runtime_list):
-	ax.annotate('(%s, %s)' % xy, xy=xy, textcoords='data')
-runtime_trend = trendline_fit(sparsity_list, runtime_list)
-plt.plot(sparsity_list, runtime_trend(sparsity_list), 'r--')
-plt.ylabel('Runtime w/ stable noise for {} '.format(chosen_mp))
-plt.xlabel('Sparsity')len
-'''
-'''
-for x in x_list:
-	print np.shape(x)
-	print np.nonzero(x)
-'''
 f, axgrid = plt.subplots(3)
 
 ind = np.arange(len(sparsity_list))
@@ -340,12 +237,23 @@ axgrid[2].set_ylabel('Runtimes (s)')
 axgrid[2].set_title('Runtimes for {} vs Sparsity'.format(chosen_mp))
 axgrid[2].set_xticks(ind+width/2)
 axgrid[2].set_xticklabels(tuple(sparsity_list)) #cannot directly take an array
-axgrid[2].legend(rms_list, ('Runtime values'))
+axgrid[2].legend(runtime_list, ('Runtime values'))
 
+'''
+ind_x = np.arange(len(x_testing[0]))
+rect3 = axgrid[3].bar(ind_x, x_testing[0], width, color='b')
+axgrid[3].set_ylabel('non-zero values')
+axgrid[3].set_title('Runtimes for {} vs Sparsity'.format(chosen_mp))
+axgrid[3].set_xticks(ind_x+width/2)
+axgrid[3].set_xticklabels(tuple(ind_x)) #cannot directly take an array
+axgrid[3].legend(x_testing[0], ('Runtime values'))
+'''
 
 autolabel(rect0, axgrid[0])
 autolabel(rect1, axgrid[1])
 autolabel(rect2, axgrid[2])
+#autolabel(rect3, axgrid[3])
+
 
 ''' #Non-Barchart version
 axgrid[0].plot(sparsity_list, error_list, 'go')
@@ -374,7 +282,6 @@ runtime_trend = trendline_fit(sparsity_list, runtime_list)
 axgrid[2].plot(sparsity_list, runtime_trend(sparsity_list), 'r--')
 axgrid[2].set_title('Runtime for {} vs Sparsity'.format(chosen_mp))
 
-
 '''
 
 
@@ -383,14 +290,7 @@ plt.show()
 
 sys.exit(0)
 
-'''
-plt.subplot2grid((3,0), (2,0), colspan=1)
-plt.plot(sparsity_values, R_error, 'yo')
-R_error_trend = trendline_fit(sparsity_values, R_error)
-plt.plot(sparsity_values, R_error_trend(sparsity_values), 'y--')
-plt.ylabel('RE for {} '.format(chosen_mp))
-plt.xlabel('Sparsity')
-'''
+
 
 
 
