@@ -16,7 +16,7 @@ import numpy as np
 
 
 from mp_functions import * #mp_functions contains all the MP algorithms to be tested.
-from Phi import Phi
+#from Phi import Phi
 import matplotlib.pyplot as plt
 import unittest
 import math
@@ -118,7 +118,7 @@ y = y_file.root.data[:]
 y_file.close()
 
 #get Phi from Phi_mini file
-file = tb.open_file("Phi_mini.h5", 'r')
+file = tb.open_file("Phi_result_mini.h5", 'r')
 Phi = file.root.data[:]
 file.close()
 '''

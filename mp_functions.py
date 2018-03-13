@@ -134,7 +134,7 @@ def omp(Phi, y, ncoef=None, maxit=1000, tol=1e-3, ztol=1e-12, verbose=False):
         
         # print status
         if verbose:
-            print('{}, {}, {}'.format(it, err[it], len(active)))
+            print('{}, {}, {}, {}'.format(it, err[it], len(active), l2_norm(residual)))
             
         # check stopping criteria
         '''
