@@ -21,7 +21,7 @@ def RMS(original_signal, test_signal):
 
 
 #function to create a new file to insert Phi, split into 2 types based on type of Phi received
-def file_create(f_name, Phi, m, n):
+def file_create(f_name, Phi, m, n=1):
 
   if type(Phi) is np.ndarray:
       print "One numpy Phi array received"
@@ -62,7 +62,11 @@ def write_new_file(f_name, Phi, m, n):
    
   #this can also be changed to slice on rows instead of columns (which is what will be done for Phi)
   for i in range(0, n, step):
-    out[:,i:min(i+step, n)] = Phi[:, i:min(i+step, n)] # initially, example was using this => (a.dot(b[:,i:min(i+bl, l)])).toarray()
+    try:
+      out[:,i:min(i+step, n)] = Phi[:, i:min(i+step, n)] # initially, example was using this => (a.dot(b[:,i:min(i+bl, l)])).toarray()
+    except Exception as e:
+      print e
+      break
     print i
   print "Phi saving done, closing file..."
    
@@ -92,7 +96,11 @@ def insert_array(f_name, array, idx, m, n):
    
   #this can also be changed to slice on rows instead of columns (which is what will be done for Phi)
   for i in range(0, n, step):
-    out[:,i:min(i+step, n)] = array[:, i:min(i+step, n)] # initially, example was using this => (a.dot(b[:,i:min(i+bl, l)])).toarray()
+    try:
+      out[:,i:min(i+step, n)] = array[:, i:min(i+step, n)] # initially, example was using this => (a.dot(b[:,i:min(i+bl, l)])).toarray()
+    except Exception as e:
+      print e
+      break
     print i
   print "Phi saving done, closing file..."
    
