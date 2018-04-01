@@ -52,6 +52,7 @@ def file_create(file_name, m, n):
 #Phi = np.random.normal(0,0.5,[6250,13000])
 
 Phi = np.random.normal(0,0.5,[m,n])
+#Phi = np.random.normal(0, 0.05, [m,n])
 
 '''
 a = rand(2000,2000, format='csr') #imagine that many values are stored in this matrix and that sparsity is low

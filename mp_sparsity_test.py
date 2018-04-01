@@ -98,18 +98,18 @@ else:
   vbose = False
 '''
 #get y from y_mini file
-y_file = tb.open_file("y_testing.h5", 'r')
+y_file = tb.open_file("y_mini.h5", 'r')
 y_actual = y_file.root.data[:]
 y_file.close()
 
 #get Phi from Phi_mini file
 #file = tb.open_file("Phi_result_mini.h5", 'r')
-file = tb.open_file("Phi_init.h5", 'r')
+file = tb.open_file("Phi_result_mini.h5", 'r')
 Phi = file.root.data[:]
 file.close()
 
 print np.shape(Phi), np.shape(y_actual)
-sys.exit(0)
+#sys.exit(0)
 
 #print_sizes(Phi, y_actual)
 
@@ -203,7 +203,7 @@ for s in sparsity_values[:]: #cannot start with sparsity 0, since that means the
     runtime.append(time)
     runtime_w_noise.append(time_noise)
   snr_values.append(SNR_Custom(y_actual, noise)) 
-  print 'done for s = ' + str(s) + ": " + str(rms_cur)
+  print 'done for s = ' + str(s) + ": " + str(rms_cur) + " " + str(rms_noise_cur)
 
 #print snr_values
 plt.figure(1)

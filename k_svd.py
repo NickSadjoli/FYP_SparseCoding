@@ -266,13 +266,13 @@ else:
 vbose = input("Verbose? ==> ")
 
 #take y from reading the .h5 file 
-y_file = tb.open_file("y_large.h5", 'r')
+y_file = tb.open_file("y_mini.h5", 'r')
 y = y_file.root.data[:]
 y_file.close()
 
 
 #take Phi from reading the other .h5 file as well.
-file = tb.open_file("Phi_small.h5", 'r')
+file = tb.open_file("Phi_mini.h5", 'r')
 Phi = file.root.data[:]
 file.close()
 m, n = np.shape(Phi)
