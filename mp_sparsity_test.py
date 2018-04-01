@@ -17,10 +17,12 @@ from sklearn.linear_model import OrthogonalMatchingPursuitCV
 from sklearn.datasets import make_sparse_coded_signal
 import numpy as np
 
+import tables as tb
+
 
 from mp_functions import * #mp_functions contains all the MP algorithms to be tested.
 from utils import *
-from Phi import Phi
+#from Phi import Phi
 import matplotlib.pyplot as plt
 import unittest
 
@@ -96,14 +98,18 @@ else:
   vbose = False
 '''
 #get y from y_mini file
-y_file = tb.open_file("y_mini.h5", 'r')
+y_file = tb.open_file("y_testing.h5", 'r')
 y_actual = y_file.root.data[:]
 y_file.close()
 
 #get Phi from Phi_mini file
-file = tb.open_file("Phi_result_mini.h5", 'r')
+#file = tb.open_file("Phi_result_mini.h5", 'r')
+file = tb.open_file("Phi_init.h5", 'r')
 Phi = file.root.data[:]
 file.close()
+
+print np.shape(Phi), np.shape(y_actual)
+sys.exit(0)
 
 #print_sizes(Phi, y_actual)
 
