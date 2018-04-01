@@ -1,6 +1,9 @@
 '''
 Author: Nicholas Sadjoli
 Description: Test script for checking performance of chosen MP based on varying sparsity of input signal
+
+Main difference with current mp_sparsity_test.py: Errors are measured between recovered sparse signal compared 
+to original sparse signal. Not comparison between original random signal vs recovered signal
 '''
 
 from __future__ import division
