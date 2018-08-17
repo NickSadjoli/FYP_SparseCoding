@@ -190,14 +190,33 @@ for s in sparsity_values[1:]: #cannot start with sparsity 0, since that means th
   snr_values.append(SNR_Custom(y_test, noise)) 
   print 'done for s = ' + str(s) + ": " + str(rms_cur)
 
+
+def plot_to_axis(ax, X, Y, color, x_label, y_label, fontsize=10):
+  ax.plot(X, Y, color+'o')
+  trend = trendline_fit(X,Y)
+  ax.plot(X, trend(X), color+'--')
+  ax.set_ylabel(y_label, fontsize=fontsize)
+  ax.set_xlabel(x_label, fontsize=fontsize)
+
+
 #print snr_values
-plt.figure(1)
+#plt.figure(1)
+fig, ((ax1,ax2,ax3)) = plt.subplots(nrows=3, ncols=1)
+plot_to_axis(ax1, sparsity_values, rms, 'g', 'Sparsity', 'RMS of {}'.format(chosen_mp))
+plot_to_axis(ax2, sparsity_values, R_error, 'y', 'Sparsity', 'RE of {}'.format(chosen_mp))
+plot_to_axis(ax3, sparsity_values, runtime, 'k', 'Sparsity', 'Runtime of {}'.format(chosen_mp))
+#plot_to_axis(ax7, sparsity_values, R_error_w_noise, 'b', 'RMS of {}'.format(chosen_mp), 'Sparsity')
+plt.tight_layout()
+plt.show()
+
+'''
 plt.subplot2grid((4,2), (0,0), colspan=1)
 plt.plot(sparsity_values, rms, 'go')
 rms_trend = trendline_fit(sparsity_values, rms)
 plt.plot(sparsity_values, rms_trend(sparsity_values), 'g--')
 plt.ylabel('RMS of {}'.format(chosen_mp))
 plt.xlabel('Sparsity')
+#plt.tight_layout()
 
 plt.subplot2grid((4,2), (1,0), colspan=1)
 plt.plot(sparsity_values, rms_w_noise, 'ro')
@@ -205,6 +224,7 @@ rms_noise_trend = trendline_fit(sparsity_values, rms_w_noise)
 plt.plot(sparsity_values, rms_noise_trend(sparsity_values), 'r--')
 plt.ylabel('RMS w/ stable noise for {} '.format(chosen_mp))
 plt.xlabel('Sparsity')
+#plt.tight_layout()
 
 plt.subplot2grid((4,2), (2,0), colspan=1)
 plt.plot(sparsity_values, R_error, 'yo')
@@ -226,6 +246,8 @@ plt.plot(sparsity_values, snr_values, 'b-')
 plt.ylabel('SNR(in dB)')
 plt.xlabel('Sparsity')
 
+
+
 if chosen_mp != "omp-scikit":
 
   plt.subplot2grid((4,2), (1,1), colspan=1)
@@ -241,6 +263,8 @@ if chosen_mp != "omp-scikit":
   plt.plot(sparsity_values, runtime_noise_trend(sparsity_values), 'r--')
   plt.ylabel('Runtime w/stable noise of {}'.format(chosen_mp))
   plt.xlabel('Sparsity')
+'''
+
 
 plt.show()
 

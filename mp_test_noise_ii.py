@@ -185,58 +185,74 @@ for db in range(1, test_num+1): #cannot start with sparsity 0, since that means 
 #print len(snr_values)
 plt.figure(1)
 
-plt.subplot2grid((4,2), (0,0), colspan=1)
+#plt.subplot2grid((4,2), (0,0), colspan=1)
 plt.plot(snr_values, rms, 'go')
 rms_trend = trendline_fit(snr_values, rms)
 plt.plot(snr_values, rms_trend(snr_values), 'g--')
 plt.ylabel('RMS of {}'.format(chosen_mp))
-plt.xlabel('SNR_per_test. (All tests is with constant sparsity of '+str(s)+')')
+plt.xlabel('SNR_values. All tests is with constant sparsity of '+str(s)+')')
 plt.suptitle('Tests done vs varying SNR (except the SNR vs num of tests itself).\n Note all tests are done with sparsity of '+str(s) , fontsize=12)
+plt.show()
 
-plt.subplot2grid((4,2), (1,0), colspan=1)
+
+plt.figure(1)
+#plt.subplot2grid((4,2), (1,0), colspan=1)
 plt.plot(snr_values, rms_w_noise, 'ro')
 rms_noise_trend = trendline_fit(snr_values, rms_w_noise)
 plt.plot(snr_values, rms_noise_trend(snr_values), 'r--')
 plt.ylabel('RMS w/ stable noise for {} '.format(chosen_mp))
-plt.xlabel('SNR_per_test')
+plt.xlabel('SNR_values (dB)')
+plt.show()
 
-plt.subplot2grid((4,2), (2,0), colspan=1)
+plt.figure(1)
+#plt.subplot2grid((4,2), (2,0), colspan=1)
 plt.plot(snr_values, R_error, 'yo')
 R_error_trend = trendline_fit(snr_values, R_error)
 plt.plot(snr_values, R_error_trend(snr_values), 'y--')
 plt.ylabel('RE for {} '.format(chosen_mp))
-plt.xlabel('SNR_per_test')
+plt.xlabel('SNR_values (dB)')
+plt.show()
 
-plt.subplot2grid((4,2), (3,0), colspan=1)
-plt.plot(snr_values, R_error_w_noise, 'bo ')
+
+plt.figure(1)
+#plt.subplot2grid((4,2), (3,0), colspan=1)
+plt.plot(snr_values, R_error_w_noise, 'bo')
 R_error_noise_trend = trendline_fit(snr_values, R_error_w_noise)
 plt.plot(snr_values, R_error_noise_trend(snr_values), 'b--')
 plt.ylabel('RE w/ stable noise for {} '.format(chosen_mp))
-plt.xlabel('SNR_per_test')
+plt.xlabel('SNR_values (dB)')
+plt.show()
 
 
 test_length = range(1, test_num+1)
 
-plt.subplot2grid((4,2), (0,1), colspan=1)
+plt.figure(1)
+#plt.subplot2grid((4,2), (0,1), colspan=1)
 plt.plot(test_length, snr_values, 'b-')
-plt.ylabel('SNR per test(in dB)')
+plt.ylabel('SNR_values (in dB)')
 plt.xlabel('nth-test')
+plt.show()
 
 if chosen_mp != "omp-scikit":
   
-  plt.subplot2grid((4,2), (1,1), colspan=1)
+  plt.figure(1)
+  #plt.subplot2grid((4,2), (1,1), colspan=1)
   plt.plot(test_length, runtime, 'ko')
   runtime_trend = trendline_fit(test_length, runtime)
   plt.plot(test_length, runtime_trend(snr_values), 'k--')
   plt.ylabel('Runtime of {}'.format(chosen_mp))
   plt.xlabel('nth-test')
-  
-  plt.subplot2grid((4,2), (2,1), colspan=1)
+  plt.show()
+
+
+  plt.figure(1)
+  #plt.subplot2grid((4,2), (2,1), colspan=1)
   plt.plot(test_length, runtime_w_noise, 'ro')
   runtime_noise_trend = trendline_fit(test_length, runtime_w_noise)
   plt.plot(test_length, runtime_noise_trend(snr_values), 'r--')
   plt.ylabel('Runtime w/stable noise of {}'.format(chosen_mp))
   plt.xlabel('nth-_test')
+  plt.show()
 
 plt.show()
 
